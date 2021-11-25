@@ -43,7 +43,11 @@ class Tile {
     update() {
         let hover = mouseX >= this.x && mouseX <= this.x + this.size && mouseY >= this.y && mouseY <= this.y + this.size;
         if (hover) {
-            ctx.fillStyle = 'yellow';
+            ctx.fillStyle = '#b3ffff';
+            this.draw();
+        }
+        else {
+            ctx.fillStyle = '#00ffff';
             this.draw();
         }
 
@@ -74,17 +78,14 @@ class Level {
 
     drawLevel() {
         for (let i = 0; i <= tileList.length - 1; i++) {
-            //console.log(tileList[i]);
             ctx.beginPath();
             tileList[i].draw();
-            //ctx.fillStyle = ctx.isPointInPath(this.x, this.y) ? 'yellow' : 'blue';
-            //ctx.fill();
         }
-        ctx.closePath();
     };
 
     update() {
         for (let i = 0; i <= tileList.length - 1; i++) {
+            ctx.beginPath();
             tileList[i].update();
         }
     }
@@ -96,10 +97,7 @@ level.createLevel();
 level.drawLevel();
 window.requestAnimationFrame(gameLoop);
 function gameLoop(timeStamp) {
-    //console.log(timeStamp);
     level.update();
-    //ctx.clearRect(0, 0, canvas.width, canvas.height);
-
     window.requestAnimationFrame(gameLoop);
 }
 
