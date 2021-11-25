@@ -12,7 +12,6 @@ function getMousePos(canvas, evt) {
     };
 }
 
-var tileList = [];
 var mouseX;
 var mouseY;
 canvas.addEventListener('mousemove', (e) => {
@@ -29,11 +28,12 @@ canvas.addEventListener('mousedown', (e) => {
 
 class Tile {
     constructor(x, y, size) {
-        this.count;
+        this.id;
         this.x = x;
         this.y = y;
         this.size = size;
         this.show = true;
+        this.bomb = false;
         ctx.strokeStyle = 'black';
         ctx.fillStyle = '#00ffff';
         ctx.lineWidth = 2;
@@ -65,49 +65,87 @@ class Tile {
             this.show = false;
         }
 
+        if (this.bomb) {
+            ctx.fillStyle = 'red';
+        }
         this.draw();
     }
 }
 
 class Level {
-    constructor(tileSize) {
-        this.tileCountWidth = canvas.width / tileSize;
-        this.tileCountHeight = canvas.height / tileSize;
+    constructor(tileSize, bombCount) {
+        this.tileList = [];
+        this.bombList = [];
+        this.bombCount = bombCount;
+        this.tileSize = tileSize;
+        this.tileCountWidth = canvas.width / this.tileSize;
+        this.tileCountHeight = canvas.height / this.tileSize;
     }
 
     createLevel() {
         let x = 0;
         let y = 0;
+        // Generate array of tiles
         for (let i = 0; i < this.tileCountWidth * this.tileCountHeight; i++) {
-            let tile = new Tile(x, y, tileSize)
-            tile.count = i + 1;
-            tileList.push(tile);
-            x += tileSize;
-            if (x >= this.tileCountWidth * tileSize) {
+            let tile = new Tile(x, y, this.tileSize)
+            tile.id = i;
+            this.tileList.push(tile);
+            x += this.tileSize;
+            if (x >= this.tileCountWidth * this.tileSize) {
                 x = 0;
-                y += tileSize;
+                y += this.tileSize;
             }
         }
-        console.log(tileList);
+
+        // Generate array of bombs by ID
+        for (let i = 0; i < this.bombCount; i++) {
+            let bombId = Math.floor(Math.random() * this.tileList.length);
+            // Prevent generating repeating bombs
+            if (this.bombList.includes(bombId)) {
+                bombId = Math.floor(Math.random() * this.tileList.length);
+                this.bombList.push(bombId);
+            }
+            else if (this.bombCount >= this.tileList.length) {
+                throw new Error('Not enough space for bombs!');
+            }
+            else {
+                this.bombList.push(bombId);
+            }
+        }
+
+        // Apply bombs
+        for (let i = 0; i < this.bombCount; i++) {
+            const index = this.tileList.map(e => e.id).indexOf(this.bombList[i]);
+            this.tileList[index].bomb = true;
+        }
+
+        console.log(this.tileList);
+        // Debug purposes
+        for (let i = 0; i < this.bombList.length; i++) {
+            console.log(this.bombList[i]);
+        }
+
     };
 
     drawLevel() {
         for (let i = 0; i <= tileList.length - 1; i++) {
             ctx.beginPath();
-            tileList[i].draw();
+            this.tileList[i].draw();
+            this.bombList[i].bomb = true;
         }
     };
 
     update() {
-        for (let i = 0; i <= tileList.length - 1; i++) {
+        for (let i = 0; i <= this.tileList.length - 1; i++) {
             ctx.beginPath();
-            tileList[i].update();
+            this.tileList[i].update();
         }
     }
 }
 
-const tileSize = 20;
-var level = new Level(tileSize);
+const tileSize = 50;
+const bombCount = 25;
+var level = new Level(tileSize, bombCount);
 level.createLevel();
 
 window.requestAnimationFrame(gameLoop);
