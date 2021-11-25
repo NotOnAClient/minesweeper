@@ -22,35 +22,50 @@ canvas.addEventListener('mousemove', (e) => {
     //console.log(mouseX, mouseY);
 })
 
+var clickedCords = [];
+canvas.addEventListener('mousedown', (e) => {
+    clickedCords = [mouseX, mouseY];
+})
+
 class Tile {
     constructor(x, y, size) {
         this.count;
         this.x = x;
         this.y = y;
         this.size = size;
+        this.show = true;
         ctx.strokeStyle = 'black';
-        ctx.fillStyle = 'blue';
+        ctx.fillStyle = '#00ffff';
         ctx.lineWidth = 2;
     }
 
 
     draw() {
-        ctx.rect(this.x, this.y, this.size, this.size);
-        ctx.fill();
-        ctx.stroke();
+        if (this.show) {
+            ctx.rect(this.x, this.y, this.size, this.size);
+            ctx.fill();
+            ctx.stroke();
+        }
+        else {
+            ctx.clearRect(this.x, this.y, this.size - 1, this.size - 1);
+        }
+
     }
 
     update() {
         let hover = mouseX >= this.x && mouseX <= this.x + this.size && mouseY >= this.y && mouseY <= this.y + this.size;
         if (hover) {
             ctx.fillStyle = '#b3ffff';
-            this.draw();
         }
         else {
             ctx.fillStyle = '#00ffff';
-            this.draw();
         }
 
+        if (clickedCords[0] >= this.x && clickedCords[0] <= this.x + this.size && clickedCords[1] >= this.y && clickedCords[1] <= this.y + this.size) {
+            this.show = false;
+        }
+
+        this.draw();
     }
 }
 
@@ -94,7 +109,7 @@ class Level {
 const tileSize = 20;
 var level = new Level(tileSize);
 level.createLevel();
-level.drawLevel();
+
 window.requestAnimationFrame(gameLoop);
 function gameLoop(timeStamp) {
     level.update();
