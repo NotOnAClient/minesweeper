@@ -4,6 +4,25 @@ var title = document.getElementById("title");
 
 canvas.style.backgroundColor = 'lightgreen';
 
+function shuffle(array) {
+    // Fisher-Yates shuffle
+    var m = array.length, t, i;
+
+    // While there remain elements to shuffle…
+    while (m) {
+
+        // Pick a remaining element…
+        i = Math.floor(Math.random() * m--);
+
+        // And swap it with the current element.
+        t = array[m];
+        array[m] = array[i];
+        array[i] = t;
+    }
+
+    return array;
+}
+
 function getMousePos(canvas, evt) {
     var rect = canvas.getBoundingClientRect();
     return {
@@ -66,8 +85,14 @@ class Tile {
             ctx.fillStyle = '#00ffff';
         }
 
-        if (clickedCords[0] > this.x && clickedCords[0] < this.x + this.size && clickedCords[1] > this.y && clickedCords[1] < this.y + this.size) {
-            this.show = false;
+        let clicked = clickedCords[0] > this.x && clickedCords[0] < this.x + this.size && clickedCords[1] > this.y && clickedCords[1] < this.y + this.size;
+        if (clicked) {
+            if (this.bombCount > 0) {
+                this.show = false;
+            }
+            else {
+                this.show = false;
+            }
         }
 
         if (this.bomb) {
@@ -87,6 +112,19 @@ class Level {
         this.tileCountHeight = canvas.height / this.tileSize;
     }
 
+    __getSurroundingIndex(index) {
+        let tileAboveIndex = index - this.tileCountWidth;
+        let tileBelowIndex = index + this.tileCountWidth;
+        let tileLeftIndex = index - 1;
+        let tileRightIndex = index + 1;
+        let tileUpLeftIndex = tileAboveIndex - 1;
+        let tileUpRightIndex = tileAboveIndex + 1;
+        let tileBottomLeftIndex = tileBelowIndex - 1;
+        let tileBottomRightIndex = tileBelowIndex + 1;
+        let numberIndexList = [tileAboveIndex, tileBelowIndex, tileLeftIndex, tileRightIndex, tileUpLeftIndex, tileUpRightIndex, tileBottomLeftIndex, tileBottomRightIndex];
+        return numberIndexList;
+    }
+
     createLevel() {
         let x = 0;
         let y = 0;
@@ -102,35 +140,20 @@ class Level {
             }
         }
 
-        // Generate array of bombs by ID
-        for (let i = 0; i < this.bombCount; i++) {
-            let bombId = Math.floor(Math.random() * this.tileList.length);
-            // Prevent generating repeating bombs
-            if (this.bombList.includes(bombId)) {
-                bombId = Math.floor(Math.random() * this.tileList.length);
-                this.bombList.push(bombId);
-            }
-            else if (this.bombCount >= this.tileList.length) {
-                throw new Error('Not enough space for bombs!');
-            }
-            else {
-                this.bombList.push(bombId);
-            }
+        // Create a bomb list with all the numbers, shuffle it and apply until the bomb count is met
+        for (let i = 0; i < this.tileList.length; i++) {
+            this.bombList.push(i);
         }
+        console.log(this.bombList);
+        shuffle(this.bombList);
+        console.log(this.bombList);
+
 
         // Apply bombs and tile numbers
         for (let i = 0; i < this.bombCount; i++) {
             const index = this.tileList.map(e => e.id).indexOf(this.bombList[i]);
             this.tileList[index].bomb = true;
-            let tileAboveIndex = index - this.tileCountWidth;
-            let tileBelowIndex = index + this.tileCountWidth;
-            let tileLeftIndex = index - 1;
-            let tileRightIndex = index + 1;
-            let tileUpLeftIndex = tileAboveIndex - 1;
-            let tileUpRightIndex = tileAboveIndex + 1;
-            let tileBottomLeftIndex = tileBelowIndex - 1;
-            let tileBottomRightIndex = tileBelowIndex + 1;
-            let numberIndexList = [tileAboveIndex, tileBelowIndex, tileLeftIndex, tileRightIndex, tileUpLeftIndex, tileUpRightIndex, tileBottomLeftIndex, tileBottomRightIndex];
+            let numberIndexList = this.__getSurroundingIndex(index);
             // Only apply numbers that are valid
             // For example, if the bomb is on the very left, make sure numbers do not apply on the other side
             for (let j = 0; j < numberIndexList.length; j++) {
@@ -167,8 +190,8 @@ class Level {
     }
 }
 
-const tileSize = 500 / 10;
-const bombCount = 20;
+const tileSize = 20;
+const bombCount = 100;
 var level = new Level(tileSize, bombCount);
 level.createLevel();
 
