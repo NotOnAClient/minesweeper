@@ -4,6 +4,10 @@ var title = document.getElementById("title");
 
 canvas.style.backgroundColor = 'lightgreen';
 
+var gameChange = false;
+var winCondition = false;
+var gameStart = false;
+
 function shuffle(array) {
     // Fisher-Yates shuffle
     var m = array.length, t, i;
@@ -42,6 +46,9 @@ canvas.addEventListener('mousemove', (e) => {
 var clickedCords = [];
 canvas.addEventListener('mousedown', (e) => {
     clickedCords = [mouseX, mouseY];
+    if (gameStart) {
+        gameChange = true;
+    }
 })
 
 class Tile {
@@ -49,18 +56,21 @@ class Tile {
         this.id;
         this.x = x;
         this.y = y;
+        this.coordinate = [{ x: this.x, y: this.y }];
         this.size = size;
         this.show = true;
         this.bomb = false;
         this.bombCount = 0;
+        this.color = '#00ffff'
         ctx.strokeStyle = 'black';
-        ctx.fillStyle = '#00ffff';
+        ctx.fillStyle = this.color;
         ctx.lineWidth = 2;
         ctx.font = '15px Arial';
     }
 
 
     draw() {
+        ctx.fillStyle = this.color;
         if (this.show) {
             ctx.rect(this.x, this.y, this.size, this.size);
             ctx.fill();
@@ -79,25 +89,26 @@ class Tile {
     update() {
         let hover = mouseX > this.x && mouseX < this.x + this.size && mouseY > this.y && mouseY < this.y + this.size;
         if (hover) {
-            ctx.fillStyle = '#b3ffff';
+            this.color = '#b3ffff';
         }
         else {
-            ctx.fillStyle = '#00ffff';
+            this.color = '#00ffff';
         }
 
         let clicked = clickedCords[0] > this.x && clickedCords[0] < this.x + this.size && clickedCords[1] > this.y && clickedCords[1] < this.y + this.size;
-        if (clicked) {
-            if (this.bombCount > 0) {
-                this.show = false;
+        if ((clicked) && gameStart) {
+            if (this.bomb) {
+                this.bombCount = 0;
+                gameStart = false;
+                winCondition = false;
+                //alert('You lost.');
             }
             else {
                 this.show = false;
             }
+
         }
 
-        if (this.bomb) {
-            ctx.fillStyle = 'red';
-        }
         this.draw();
     }
 }
@@ -110,6 +121,8 @@ class Level {
         this.tileSize = tileSize;
         this.tileCountWidth = canvas.width / this.tileSize;
         this.tileCountHeight = canvas.height / this.tileSize;
+        this.clicked = false;
+        this.boardChange = false;
     }
 
     __getSurroundingIndex(index) {
@@ -144,10 +157,14 @@ class Level {
         for (let i = 0; i < this.tileList.length; i++) {
             this.bombList.push(i);
         }
-        console.log(this.bombList);
-        shuffle(this.bombList);
-        console.log(this.bombList);
 
+        // Shuffle
+        shuffle(this.bombList);
+
+        // Delete unused bombs
+        for (let i = this.tileList.length - 1; i > this.bombCount - 1; i--) {
+            this.bombList.pop();
+        }
 
         // Apply bombs and tile numbers
         for (let i = 0; i < this.bombCount; i++) {
@@ -157,6 +174,7 @@ class Level {
             // Only apply numbers that are valid
             // For example, if the bomb is on the very left, make sure numbers do not apply on the other side
             for (let j = 0; j < numberIndexList.length; j++) {
+                // If number out of range
                 if (numberIndexList[j] >= this.tileList.length || numberIndexList[j] < 0) {
                     // Do nothing
                 }
@@ -182,23 +200,71 @@ class Level {
 
     };
 
+    breakTiles(i) {
+        // If Tile is destroyed and bombCount is 0
+        if ((!this.tileList[i].show && this.tileList[i].bombCount == 0)) {
+            let numberIndexList = this.__getSurroundingIndex(i);
+            for (let j = 0; j < numberIndexList.length; j++) {
+                if (!(numberIndexList[j] < 0 || numberIndexList[j] > this.tileList.length - 1)) {
+                    if (this.tileList[numberIndexList[j]].bombCount == 0 || !this.tileList[numberIndexList[j]].bomb) {
+                        // [up, down, left, right, topleft, topright, bottomleft, bottomright]
+                        // Indexes left: 2, 4, 6
+                        if (this.tileList[i].x == 0 && (j == 2 || j == 4 || j == 6)) {
+                            //console.log('left');
+                        }
+                        else if (this.tileList[i].x == canvas.width - this.tileList[i].size && (j == 3 || j == 5 || j == 7)) {
+                            //console.log('right');
+                        }
+                        else {
+                            this.tileList[numberIndexList[j]].show = false;
+                        }
+
+                    }
+                }
+            }
+        }
+
+    }
+
     update() {
-        for (let i = 0; i <= this.tileList.length - 1; i++) {
-            ctx.beginPath();
-            this.tileList[i].update();
+        if (gameStart) {
+            for (let i = 0; i <= this.tileList.length - 1; i++) {
+                ctx.beginPath();
+                this.tileList[i].update();
+            }
+        }
+
+
+        while (gameChange) {
+            // let numberIndexList = this.__getSurroundingIndex(i);
+            // numberIndexList.forEach(this.tileList[i].show = true);
+            for (let i = 0; i < this.tileList.length; i++) {
+                this.breakTiles(i);
+            }
+            for (let i = this.tileList.length - 1; i > 0; i--) {
+                this.breakTiles(i);
+            }
+            gameChange = false;
         }
     }
 }
 
-const tileSize = 20;
-const bombCount = 100;
+const tileSize = 50;
+const bombCount = 20;
+
 var level = new Level(tileSize, bombCount);
 level.createLevel();
 
 window.requestAnimationFrame(gameLoop);
 function gameLoop(timeStamp) {
+    gameStart = true;
     level.update();
+    if (!gameStart && !winCondition) {
+        for (let i = 0; i < level.bombList.length; i++) {
+            level.tileList[level.bombList[i]].color = 'red';
+            level.tileList[level.bombList[i]].draw();
+        }
+        return;
+    }
     window.requestAnimationFrame(gameLoop);
 }
-
-

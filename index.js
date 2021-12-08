@@ -6,7 +6,7 @@ const path = require('path');
 // Express Middleware for serving static files
 app.use('/js', express.static(path.join(__dirname, './js')));
 
-app.use(express.static(__dirname + '/css'));
+app.use('/css', express.static(path.join(__dirname, './css')));
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, './index.html'));
