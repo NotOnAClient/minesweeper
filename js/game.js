@@ -1,4 +1,5 @@
 var canvas = document.getElementById("mainCanvas");
+var displayMineCount = document.getElementById("mineCount");
 var ctx = canvas.getContext("2d");
 var title = document.getElementById("title");
 
@@ -8,24 +9,6 @@ var gameChange = false;
 var winCondition = false;
 var gameStart = false;
 
-function shuffle(array) {
-    // Fisher-Yates shuffle
-    var m = array.length, t, i;
-
-    // While there remain elements to shuffle…
-    while (m) {
-
-        // Pick a remaining element…
-        i = Math.floor(Math.random() * m--);
-
-        // And swap it with the current element.
-        t = array[m];
-        array[m] = array[i];
-        array[i] = t;
-    }
-
-    return array;
-}
 
 function getMousePos(canvas, evt) {
     var rect = canvas.getBoundingClientRect();
@@ -44,11 +27,38 @@ canvas.addEventListener('mousemove', (e) => {
 })
 
 var clickedCords = [];
+var flaggedCords = [];
 canvas.addEventListener('mousedown', (e) => {
-    clickedCords = [mouseX, mouseY];
-    if (gameStart) {
-        gameChange = true;
+    if (typeof e === 'object') {
+        switch (e.button) {
+            case 0:
+                clickedCords = [mouseX, mouseY];
+                break;
+            case 2:
+                flaggedCords = [mouseX, mouseY];
+                level.flagChange = true;
+        }
     }
+    gameChange = true;
+
+})
+
+canvas.addEventListener('mouseup', (e) => {
+    if (typeof e === 'object') {
+        switch (e.button) {
+            case 0:
+                clickedCords = [mouseX, mouseY];
+                break;
+            case 2:
+                level.rightClicked = true;
+                level.flagChange = true;
+        }
+    }
+})
+
+// Prevent right click menu from popping up
+window.addEventListener('contextmenu', (event) => {
+    event.preventDefault()
 })
 
 class Tile {
@@ -56,12 +66,15 @@ class Tile {
         this.id;
         this.x = x;
         this.y = y;
-        this.coordinate = [{ x: this.x, y: this.y }];
+        this.coordinate = [this.x, this.y];
         this.size = size;
+        this.flagged = false;
         this.show = true;
         this.bomb = false;
         this.bombCount = 0;
         this.color = '#00ffff'
+        this.Leftclicked = false;
+        this.rightClicked = false;
         ctx.strokeStyle = 'black';
         ctx.fillStyle = this.color;
         ctx.lineWidth = 2;
@@ -70,7 +83,9 @@ class Tile {
 
 
     draw() {
+        // Apply colour changes
         ctx.fillStyle = this.color;
+
         if (this.show) {
             ctx.rect(this.x, this.y, this.size, this.size);
             ctx.fill();
@@ -78,38 +93,63 @@ class Tile {
         }
         else {
             ctx.clearRect(this.x, this.y, this.size - 1, this.size - 1);
+            // Display numbers
             if (this.bombCount > 0) {
                 ctx.fillStyle = 'black';
                 ctx.fillText(this.bombCount, this.x, this.y + this.size);
             }
         }
-
     }
 
     update() {
+        // Detect hover
         let hover = mouseX > this.x && mouseX < this.x + this.size && mouseY > this.y && mouseY < this.y + this.size;
-        if (hover) {
+        if (hover && !this.flagged) {
             this.color = '#b3ffff';
+        }
+        else if (this.flagged) {
+            this.color = 'yellow';
         }
         else {
             this.color = '#00ffff';
         }
 
-        let clicked = clickedCords[0] > this.x && clickedCords[0] < this.x + this.size && clickedCords[1] > this.y && clickedCords[1] < this.y + this.size;
-        if ((clicked) && gameStart) {
+        // Detect if clicked
+        let n = 0;
+        let LeftClicked = clickedCords[0] > this.x && clickedCords[0] < this.x + this.size && clickedCords[1] > this.y && clickedCords[1] < this.y + this.size;
+        let rightClicked = flaggedCords[0] > this.x && flaggedCords[0] < this.x + this.size && flaggedCords[1] > this.y && flaggedCords[1] < this.y + this.size;
+        if (LeftClicked) {
             if (this.bomb) {
                 this.bombCount = 0;
                 gameStart = false;
                 winCondition = false;
-                //alert('You lost.');
+            }
+            else if (this.flagged) {
+                this.flagged = false;
             }
             else {
                 this.show = false;
             }
 
         }
+        else if (rightClicked) {
+            flaggedCords[0] = null;
+            flaggedCords[1] = null;
+            this.flagged = !this.flagged;
+            if (this.flagged) {
+                n = 1;
+            }
+            else if (!this.flagged) {
+                n = -1;
+            }
+            else {
+                n = 0;
+            }
+
+        }
 
         this.draw();
+        return n;
     }
 }
 
@@ -119,6 +159,9 @@ class Level {
         this.bombList = [];
         this.bombCount = bombCount;
         this.tileSize = tileSize;
+        this.remainingTileCount;
+        this.remainingFlagCount = this.bombCount;
+        this.flagChange = false;
         this.tileCountWidth = canvas.width / this.tileSize;
         this.tileCountHeight = canvas.height / this.tileSize;
         this.clicked = false;
@@ -138,6 +181,25 @@ class Level {
         return numberIndexList;
     }
 
+    shuffle(array) {
+        // Fisher-Yates shuffle
+        var m = array.length, t, i;
+
+        // While there remain elements to shuffle…
+        while (m) {
+
+            // Pick a remaining element…
+            i = Math.floor(Math.random() * m--);
+
+            // And swap it with the current element.
+            t = array[m];
+            array[m] = array[i];
+            array[i] = t;
+        }
+
+        return array;
+    }
+
     createLevel() {
         let x = 0;
         let y = 0;
@@ -153,13 +215,15 @@ class Level {
             }
         }
 
+        this.remainingTileCount = this.tileList.length - this.bombCount;
+
         // Create a bomb list with all the numbers, shuffle it and apply until the bomb count is met
         for (let i = 0; i < this.tileList.length; i++) {
             this.bombList.push(i);
         }
 
         // Shuffle
-        shuffle(this.bombList);
+        this.shuffle(this.bombList);
 
         // Delete unused bombs
         for (let i = this.tileList.length - 1; i > this.bombCount - 1; i--) {
@@ -205,6 +269,7 @@ class Level {
         if ((!this.tileList[i].show && this.tileList[i].bombCount == 0)) {
             let numberIndexList = this.__getSurroundingIndex(i);
             for (let j = 0; j < numberIndexList.length; j++) {
+                // if NOT index less than 0 or NOT index more than tileList length (if index is in range)
                 if (!(numberIndexList[j] < 0 || numberIndexList[j] > this.tileList.length - 1)) {
                     if (this.tileList[numberIndexList[j]].bombCount == 0 || !this.tileList[numberIndexList[j]].bomb) {
                         // [up, down, left, right, topleft, topright, bottomleft, bottomright]
@@ -226,18 +291,20 @@ class Level {
 
     }
 
+
     update() {
-        if (gameStart) {
-            for (let i = 0; i <= this.tileList.length - 1; i++) {
-                ctx.beginPath();
-                this.tileList[i].update();
-            }
+
+        displayMineCount.innerHTML = 'Mines remaining: ' + this.remainingFlagCount;
+
+        // Draw all the tiles
+        for (let i = 0; i <= this.tileList.length - 1; i++) {
+            ctx.beginPath();
+            let flagNum = this.tileList[i].update();
+            this.remainingFlagCount = this.remainingFlagCount - flagNum;
         }
 
-
+        // Update tile breaking and flags
         while (gameChange) {
-            // let numberIndexList = this.__getSurroundingIndex(i);
-            // numberIndexList.forEach(this.tileList[i].show = true);
             for (let i = 0; i < this.tileList.length; i++) {
                 this.breakTiles(i);
             }
@@ -246,11 +313,15 @@ class Level {
             }
             gameChange = false;
         }
+
+        if (this.remainingTileCount == 0) {
+            winCondition = true;
+        }
     }
 }
 
-const tileSize = 50;
-const bombCount = 20;
+const tileSize = 20;
+const bombCount = 100;
 
 var level = new Level(tileSize, bombCount);
 level.createLevel();
@@ -259,11 +330,16 @@ window.requestAnimationFrame(gameLoop);
 function gameLoop(timeStamp) {
     gameStart = true;
     level.update();
+    // Lose condition
     if (!gameStart && !winCondition) {
         for (let i = 0; i < level.bombList.length; i++) {
             level.tileList[level.bombList[i]].color = 'red';
             level.tileList[level.bombList[i]].draw();
         }
+        return;
+    }
+    else if (!gameStart && winCondition) {
+        alert('You won!');
         return;
     }
     window.requestAnimationFrame(gameLoop);
