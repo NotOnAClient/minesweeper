@@ -1,68 +1,10 @@
-var canvas = document.getElementById("mainCanvas");
-var displayMineCount = document.getElementById("mineCount");
-var ctx = canvas.getContext("2d");
-var title = document.getElementById("title");
+let canvas = document.getElementById("mainCanvas");
+let title = document.getElementById("title");
 
-canvas.style.backgroundColor = 'lightgreen';
-
-var gameChange = false;
-var winCondition = false;
-var gameStart = false;
-
-
-function getMousePos(canvas, evt) {
-    var rect = canvas.getBoundingClientRect();
-    return {
-        x: evt.clientX - rect.left,
-        y: evt.clientY - rect.top
-    };
-}
-
-var mouseX;
-var mouseY;
-canvas.addEventListener('mousemove', (e) => {
-    var mousePos = getMousePos(canvas, e);
-    mouseX = mousePos.x;
-    mouseY = mousePos.y;
-})
-
-var clickedCords = [];
-var flaggedCords = [];
-canvas.addEventListener('mousedown', (e) => {
-    if (typeof e === 'object') {
-        switch (e.button) {
-            case 0:
-                clickedCords = [mouseX, mouseY];
-                break;
-            case 2:
-                flaggedCords = [mouseX, mouseY];
-                level.flagChange = true;
-        }
-    }
-    gameChange = true;
-
-})
-
-canvas.addEventListener('mouseup', (e) => {
-    if (typeof e === 'object') {
-        switch (e.button) {
-            case 0:
-                clickedCords = [mouseX, mouseY];
-                break;
-            case 2:
-                level.rightClicked = true;
-                level.flagChange = true;
-        }
-    }
-})
-
-// Prevent right click menu from popping up
-window.addEventListener('contextmenu', (event) => {
-    event.preventDefault()
-})
 
 class Tile {
-    constructor(x, y, size) {
+    constructor(ctx, x, y, size) {
+        this.ctx = ctx;
         this.id;
         this.x = x;
         this.y = y;
@@ -71,10 +13,12 @@ class Tile {
         this.flagged = false;
         this.show = true;
         this.bomb = false;
+        this.bombClicked = false;
         this.bombCount = 0;
         this.color = '#00ffff'
         this.Leftclicked = false;
         this.rightClicked = false;
+        this.hover = false;
         ctx.strokeStyle = 'black';
         ctx.fillStyle = this.color;
         ctx.lineWidth = 2;
@@ -84,27 +28,26 @@ class Tile {
 
     draw() {
         // Apply colour changes
-        ctx.fillStyle = this.color;
+        this.ctx.fillStyle = this.color;
 
         if (this.show) {
-            ctx.rect(this.x, this.y, this.size, this.size);
-            ctx.fill();
-            ctx.stroke();
+            this.ctx.rect(this.x, this.y, this.size, this.size);
+            this.ctx.fill();
+            this.ctx.stroke();
         }
         else {
-            ctx.clearRect(this.x, this.y, this.size - 1, this.size - 1);
+            this.ctx.clearRect(this.x, this.y, this.size - 1, this.size - 1);
             // Display numbers
             if (this.bombCount > 0) {
-                ctx.fillStyle = 'black';
-                ctx.fillText(this.bombCount, this.x, this.y + this.size);
+                this.ctx.fillStyle = 'black';
+                this.ctx.fillText(this.bombCount, this.x, this.y + this.size);
             }
         }
     }
 
     update() {
         // Detect hover
-        let hover = mouseX > this.x && mouseX < this.x + this.size && mouseY > this.y && mouseY < this.y + this.size;
-        if (hover && !this.flagged) {
+        if (this.hover && !this.flagged) {
             this.color = '#b3ffff';
         }
         else if (this.flagged) {
@@ -116,13 +59,11 @@ class Tile {
 
         // Detect if clicked
         let n = 0;
-        let LeftClicked = clickedCords[0] > this.x && clickedCords[0] < this.x + this.size && clickedCords[1] > this.y && clickedCords[1] < this.y + this.size;
-        let rightClicked = flaggedCords[0] > this.x && flaggedCords[0] < this.x + this.size && flaggedCords[1] > this.y && flaggedCords[1] < this.y + this.size;
-        if (LeftClicked) {
+
+        if (this.LeftClicked) {
             if (this.bomb) {
                 this.bombCount = 0;
-                gameStart = false;
-                winCondition = false;
+                this.bombClicked = true;
             }
             else if (this.flagged) {
                 this.flagged = false;
@@ -132,10 +73,9 @@ class Tile {
             }
 
         }
-        else if (rightClicked) {
-            flaggedCords[0] = null;
-            flaggedCords[1] = null;
+        else if (this.rightClicked) {
             this.flagged = !this.flagged;
+            // Returns the change in flag number
             if (this.flagged) {
                 n = 1;
             }
@@ -149,12 +89,14 @@ class Tile {
         }
 
         this.draw();
-        return n;
+        return [n, this.bombClicked];
     }
 }
 
 class Level {
-    constructor(tileSize, bombCount) {
+    constructor(ctx, canvas, tileSize, bombCount) {
+        this.ctx = ctx;
+        this.canvas = canvas;
         this.tileList = [];
         this.bombList = [];
         this.bombCount = bombCount;
@@ -162,10 +104,12 @@ class Level {
         this.remainingTileCount;
         this.remainingFlagCount = this.bombCount;
         this.flagChange = false;
-        this.tileCountWidth = canvas.width / this.tileSize;
-        this.tileCountHeight = canvas.height / this.tileSize;
+        this.tileCountWidth = this.canvas.width / this.tileSize;
+        this.tileCountHeight = this.canvas.height / this.tileSize;
         this.clicked = false;
         this.boardChange = false;
+        this.clickedCords = [];
+        this.flaggedCords = [];
     }
 
     __getSurroundingIndex(index) {
@@ -205,7 +149,7 @@ class Level {
         let y = 0;
         // Generate array of tiles
         for (let i = 0; i < this.tileCountWidth * this.tileCountHeight; i++) {
-            let tile = new Tile(x, y, this.tileSize)
+            let tile = new Tile(this.ctx, x, y, this.tileSize)
             tile.id = i;
             this.tileList.push(tile);
             x += this.tileSize;
@@ -249,7 +193,7 @@ class Level {
                         this.tileList[numberIndexList[j]].bombCount += 1;
                     }
                 }
-                else if (this.tileList[index].x == canvas.width - this.tileSize) {
+                else if (this.tileList[index].x == this.canvas.width - this.tileSize) {
                     // Indexes right of bomb: 3, 5, 7
                     if (!(j == 3 || j == 5 || j == 7)) {
                         this.tileList[numberIndexList[j]].bombCount += 1;
@@ -265,42 +209,70 @@ class Level {
     };
 
     breakTiles(i) {
-        // If Tile is destroyed and bombCount is 0
-        if ((!this.tileList[i].show && this.tileList[i].bombCount == 0)) {
-            let numberIndexList = this.__getSurroundingIndex(i);
-            for (let j = 0; j < numberIndexList.length; j++) {
-                // if NOT index less than 0 or NOT index more than tileList length (if index is in range)
-                if (!(numberIndexList[j] < 0 || numberIndexList[j] > this.tileList.length - 1)) {
-                    if (this.tileList[numberIndexList[j]].bombCount == 0 || !this.tileList[numberIndexList[j]].bomb) {
-                        // [up, down, left, right, topleft, topright, bottomleft, bottomright]
-                        // Indexes left: 2, 4, 6
-                        if (this.tileList[i].x == 0 && (j == 2 || j == 4 || j == 6)) {
-                            //console.log('left');
+        if (this.tileList[i].bombCount === 0 && !this.tileList[i].show) {
+            let index = this.__getSurroundingIndex(i);
+            for (let j = 0; j < index.length; j++) {
+                if (index[j] >= 0 && index[j] < this.tileList.length) {
+                    if (!this.tileList[index[j]].show || !this.tileList[index[j]].bomb) {
+                        if (this.tileList[i].x == 0) {
+                            if (!(j == 2 || j == 4 || j == 6)) {
+                                this.tileList[index[j]].show = false;
+                            }
                         }
-                        else if (this.tileList[i].x == canvas.width - this.tileList[i].size && (j == 3 || j == 5 || j == 7)) {
-                            //console.log('right');
+                        else if (this.tileList[i].x == this.canvas.width - this.tileSize) {
+                            if (!(j == 3 || j == 5 || j == 7)) {
+                                this.tileList[index[j]].show = false;
+                            }
                         }
                         else {
-                            this.tileList[numberIndexList[j]].show = false;
+                            this.tileList[index[j]].show = false;
                         }
-
                     }
                 }
             }
+        }
+        else if (!this.tileList[i].show) {
+            this.remainingTileCount--;
         }
 
     }
 
 
-    update() {
+    update(gameChange, displayMineCount) {
 
         displayMineCount.innerHTML = 'Mines remaining: ' + this.remainingFlagCount;
 
         // Draw all the tiles
         for (let i = 0; i <= this.tileList.length - 1; i++) {
-            ctx.beginPath();
-            let flagNum = this.tileList[i].update();
-            this.remainingFlagCount = this.remainingFlagCount - flagNum;
+            this.ctx.beginPath();
+            let callback = this.tileList[i].update();
+            this.remainingFlagCount = this.remainingFlagCount - callback[0];
+
+            if (callback[1]) {
+                return 1;
+            }
+
+            let hover = this.mouseX > this.tileList[i].x && this.mouseX < this.tileList[i].x + this.tileList[i].size && this.mouseY > this.tileList[i].y && this.mouseY < this.tileList[i].y + this.tileList[i].size;
+            if (hover) {
+                this.tileList[i].hover = true;
+            }
+            else {
+                this.tileList[i].hover = false;
+            }
+
+            let LeftClicked = this.clickedCords[0] > this.tileList[i].x && this.clickedCords[0] < this.tileList[i].x + this.tileList[i].size && this.clickedCords[1] > this.tileList[i].y && this.clickedCords[1] < this.tileList[i].y + this.tileList[i].size;
+            let rightClicked = this.flaggedCords[0] > this.tileList[i].x && this.flaggedCords[0] < this.tileList[i].x + this.tileList[i].size && this.flaggedCords[1] > this.tileList[i].y && this.flaggedCords[1] < this.tileList[i].y + this.tileList[i].size;
+            if (LeftClicked) {
+                this.tileList[i].LeftClicked = true;
+            }
+            else if (rightClicked) {
+                this.tileList[i].rightClicked = true;
+                this.flaggedCords[0] = null;
+                this.flaggedCords[1] = null;
+            }
+            else {
+                this.tileList[i].rightClicked = false;
+            }
         }
 
         // Update tile breaking and flags
@@ -308,39 +280,126 @@ class Level {
             for (let i = 0; i < this.tileList.length; i++) {
                 this.breakTiles(i);
             }
-            for (let i = this.tileList.length - 1; i > 0; i--) {
-                this.breakTiles(i);
-            }
+            console.log(this.remainingTileCount);
             gameChange = false;
         }
 
-        if (this.remainingTileCount == 0) {
-            winCondition = true;
-        }
     }
 }
 
-const tileSize = 20;
-const bombCount = 100;
+class Game {
+    constructor(gameCanvas) {
+        this.tileSize = 20;
+        this.bombCount = 100;
+        this.gameChange = false;
+        this.winCondition;
+        this.mouseX;
+        this.mouseY;
+        this.clickedCords = [];
+        this.flaggedCords = [];
+        this.canvas = gameCanvas;
+        this.displayMineCount;
+        this.level;
+        this.pause = false;
+    }
 
-var level = new Level(tileSize, bombCount);
-level.createLevel();
+    load() {
+        let ctx = this.canvas.getContext("2d");
 
-window.requestAnimationFrame(gameLoop);
-function gameLoop(timeStamp) {
-    gameStart = true;
-    level.update();
-    // Lose condition
-    if (!gameStart && !winCondition) {
-        for (let i = 0; i < level.bombList.length; i++) {
-            level.tileList[level.bombList[i]].color = 'red';
-            level.tileList[level.bombList[i]].draw();
+        this.canvas.style.backgroundColor = 'lightgreen';
+        this.displayMineCount = document.getElementById("mineCount");
+
+        this.canvas.width = 500;
+        this.canvas.height = 500;
+
+        this.level = new Level(ctx, this.canvas, this.tileSize, this.bombCount);
+        this.level.createLevel();
+
+        this.canvas.addEventListener('mousemove', (e) => {
+            let mousePos = this.getMousePos(this.canvas, e);
+            this.mouseX = mousePos.x;
+            this.mouseY = mousePos.y;
+        })
+
+        this.canvas.addEventListener('mousedown', (e) => {
+            if (typeof e === 'object') {
+                switch (e.button) {
+                    case 0:
+                        this.clickedCords = [this.mouseX, this.mouseY];
+                        break;
+                    case 2:
+                        this.flaggedCords = [this.mouseX, this.mouseY];
+                        this.level.flagChange = true;
+                }
+            }
+            this.gameChange = true;
+        })
+
+        this.canvas.addEventListener('mouseup', (e) => {
+            if (typeof e === 'object') {
+                switch (e.button) {
+                    case 0:
+                        this.clickedCords = [this.mouseX, this.mouseY];
+                        break;
+                    case 2:
+                        this.level.rightClicked = true;
+                        this.level.flagChange = true;
+                }
+            }
+        })
+
+        // Prevent right click menu from popping up
+        window.addEventListener('contextmenu', (event) => {
+            event.preventDefault()
+        })
+
+    }
+
+    getMousePos(canvas, evt) {
+        let rect = canvas.getBoundingClientRect();
+        return {
+            x: evt.clientX - rect.left,
+            y: evt.clientY - rect.top
+        };
+    }
+
+    gameLoop(timeStamp) {
+        this.level.clickedCords = this.clickedCords;
+        this.level.flaggedCords = this.flaggedCords;
+        this.level.mouseX = this.mouseX;
+        this.level.mouseY = this.mouseY;
+        let callback = this.level.update(this.gameChange, this.displayMineCount);
+
+        if (callback === 1) {
+            this.winCondition = false;
         }
-        return;
+
+        // Lose condition
+        if (this.winCondition === false) {
+            for (let i = 0; i < this.level.bombList.length; i++) {
+                this.level.tileList[this.level.bombList[i]].color = 'red';
+                this.level.tileList[this.level.bombList[i]].draw();
+            }
+            return;
+        }
+        else if (this.winCondition) {
+            alert('You won!');
+            return;
+        }
+
+        if (this.pause) {
+            return;
+        }
+        window.requestAnimationFrame(this.gameLoop.bind(this));
     }
-    else if (!gameStart && winCondition) {
-        alert('You won!');
-        return;
+
+    start() {
+        // https://stackoverflow.com/questions/33554137/js-object-in-a-canvas-game-uncaught-typeerror-cannot-read-property-x-of-undef
+        window.requestAnimationFrame(this.gameLoop.bind(this));
     }
-    window.requestAnimationFrame(gameLoop);
+
 }
+
+let game = new Game(canvas);
+game.load();
+game.start();
