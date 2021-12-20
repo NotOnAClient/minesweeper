@@ -94,7 +94,7 @@ class Tile {
 }
 
 class Level {
-    constructor(ctx, canvas, tileSize, bombCount) {
+    constructor(ctx, canvas, width, height, tileSize, bombCount) {
         this.ctx = ctx;
         this.canvas = canvas;
         this.tileList = [];
@@ -105,8 +105,8 @@ class Level {
         this.tilesBroken = [];
         this.remainingFlagCount = this.bombCount;
         this.flagChange = false;
-        this.tileCountWidth = this.canvas.width / this.tileSize;
-        this.tileCountHeight = this.canvas.height / this.tileSize;
+        this.tileCountWidth = width;
+        this.tileCountHeight = height;
         this.clicked = false;
         this.boardChange = false;
         this.clickedCords = [];
@@ -281,9 +281,11 @@ class Level {
 }
 
 class Game {
-    constructor(gameCanvas) {
-        this.tileSize = 50;
-        this.bombCount = 10;
+    constructor(gameCanvas, width, height, tileSize, bombCount) {
+        this.tileSize = tileSize;
+        this.width = width;
+        this.height = height;
+        this.bombCount = bombCount;
         this.gameChange = false;
         this.winCondition;
         this.mouseX;
@@ -302,11 +304,14 @@ class Game {
         this.canvas.style.backgroundColor = 'lightgreen';
         this.displayMineCount = document.getElementById("mineCount");
 
-        this.canvas.width = 500;
-        this.canvas.height = 500;
+        this.canvas.width = this.width * this.tileSize;
+        this.canvas.height = this.height * this.tileSize;
 
-        this.level = new Level(ctx, this.canvas, this.tileSize, this.bombCount);
+        this.level = new Level(ctx, this.canvas, this.width, this.height, this.tileSize, this.bombCount);
         this.level.createLevel();
+
+        this.level.tileCountWidth = this.width;
+        this.level.tileCountHeight = this.height;
 
         this.canvas.addEventListener('mousemove', (e) => {
             let mousePos = this.getMousePos(this.canvas, e);
@@ -397,6 +402,6 @@ class Game {
 
 }
 
-let game = new Game(canvas);
+let game = new Game(canvas, 10, 10, 30, 5);
 game.load();
 game.start();
