@@ -89,7 +89,7 @@ class Tile {
         }
 
         this.draw();
-        return [n, this.bombClicked];
+        return [n, this.bombClicked, this.id];
     }
 }
 
@@ -102,6 +102,7 @@ class Level {
         this.bombCount = bombCount;
         this.tileSize = tileSize;
         this.remainingTileCount;
+        this.tilesBroken = [];
         this.remainingFlagCount = this.bombCount;
         this.flagChange = false;
         this.tileCountWidth = this.canvas.width / this.tileSize;
@@ -231,14 +232,10 @@ class Level {
                 }
             }
         }
-        else if (!this.tileList[i].show) {
-            this.remainingTileCount--;
-        }
-
     }
 
 
-    update(gameChange, displayMineCount) {
+    update(displayMineCount) {
 
         displayMineCount.innerHTML = 'Mines remaining: ' + this.remainingFlagCount;
 
@@ -250,6 +247,10 @@ class Level {
 
             if (callback[1]) {
                 return 1;
+            }
+
+            if (!this.tileList[callback[2]].show && !this.tilesBroken.includes(callback[2])) {
+                this.tilesBroken.push(callback[2]);
             }
 
             let hover = this.mouseX > this.tileList[i].x && this.mouseX < this.tileList[i].x + this.tileList[i].size && this.mouseY > this.tileList[i].y && this.mouseY < this.tileList[i].y + this.tileList[i].size;
@@ -273,24 +274,16 @@ class Level {
             else {
                 this.tileList[i].rightClicked = false;
             }
-        }
 
-        // Update tile breaking and flags
-        while (gameChange) {
-            for (let i = 0; i < this.tileList.length; i++) {
-                this.breakTiles(i);
-            }
-            console.log(this.remainingTileCount);
-            gameChange = false;
+            this.breakTiles(i);
         }
-
     }
 }
 
 class Game {
     constructor(gameCanvas) {
-        this.tileSize = 20;
-        this.bombCount = 100;
+        this.tileSize = 50;
+        this.bombCount = 10;
         this.gameChange = false;
         this.winCondition;
         this.mouseX;
@@ -330,9 +323,9 @@ class Game {
                     case 2:
                         this.flaggedCords = [this.mouseX, this.mouseY];
                         this.level.flagChange = true;
+                        break;
                 }
             }
-            this.gameChange = true;
         })
 
         this.canvas.addEventListener('mouseup', (e) => {
@@ -344,6 +337,7 @@ class Game {
                     case 2:
                         this.level.rightClicked = true;
                         this.level.flagChange = true;
+                        break;
                 }
             }
         })
@@ -368,10 +362,13 @@ class Game {
         this.level.flaggedCords = this.flaggedCords;
         this.level.mouseX = this.mouseX;
         this.level.mouseY = this.mouseY;
-        let callback = this.level.update(this.gameChange, this.displayMineCount);
+        let callback = this.level.update(this.displayMineCount);
 
         if (callback === 1) {
             this.winCondition = false;
+        }
+        else if (this.level.tilesBroken.length == this.level.remainingTileCount) {
+            this.winCondition = true;
         }
 
         // Lose condition
@@ -383,7 +380,7 @@ class Game {
             return;
         }
         else if (this.winCondition) {
-            alert('You won!');
+            setTimeout(() => { alert('You won!'); }, 1000);
             return;
         }
 
